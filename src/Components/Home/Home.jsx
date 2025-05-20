@@ -1,13 +1,8 @@
-import { Bar } from "react-chartjs-2";
-import { DatePicker, Space } from "antd";
-import { GoDotFill } from "react-icons/go";
-import graph from "../../assets/graph.png";
+import { Button, DatePicker, Space, Modal, Form, Input, Select } from "antd";
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { FaCircleExclamation } from "react-icons/fa6";
-ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
-import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from "chart.js";
+import { useNavigate } from "react-router-dom";
 import { fn_getAdminsTransactionApi, fn_getCardDataByStatus, fn_getAllTransactionApi } from "../../api/api";
+import { FaIndianRupeeSign } from "react-icons/fa6";
 
 const Home = ({ authorization, showSidebar }) => {
   const navigate = useNavigate();
@@ -21,13 +16,13 @@ const Home = ({ authorization, showSidebar }) => {
   const [activeFilter, setActiveFilter] = useState("all");
   const [dateRange, setDateRange] = useState([null, null]);
   const [totalTransaction, setTotalTransactions] = useState(0);
-  const [recentTransactions, setRecentTransactions] = useState([]);
   const [declineTransactions, setDeclineTransactions] = useState(0);
   const [merchantAvailBalance, setMerchantAvailBalance] = useState(0);
   const [verifiedTransactions, setVerifiedTransactions] = useState(0);
   const [unverifiedTransactions, setUnverifiedTransactions] = useState(0);
   const [cardData, setCardData] = useState({ approved: {},pending: {},failed: {}, });
-
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [form] = Form.useForm();
 
   useEffect(() => {
     window.scroll(0, 0);
@@ -40,13 +35,12 @@ const Home = ({ authorization, showSidebar }) => {
   const fetchAllData = async () => {
     try {
       setLoading(true);
-      const [approvedData, pendingData, declineData, totalData, recentTrxData] =
+      const [approvedData, pendingData, declineData, totalData] =
         await Promise.all([
           fn_getCardDataByStatus("Approved", activeFilter, dateRange),
           fn_getCardDataByStatus("Pending", activeFilter, dateRange),
           fn_getCardDataByStatus("Decline", activeFilter, dateRange),
           fn_getAllTransactionApi(null, 1, null, null, null, dateRange),
-          fn_getAdminsTransactionApi(null, null, null, null, dateRange),
         ]);
       // Set transaction counts
       setVerifiedTransactions(approvedData?.data?.data || 0);
@@ -63,17 +57,9 @@ const Home = ({ authorization, showSidebar }) => {
         pending: pendingData?.data || {},
         failed: declineData?.data || {},
       });
-
-      // Update recent transactions
-      if (recentTrxData?.status && recentTrxData?.data?.data) {
-        setRecentTransactions(recentTrxData.data.data.slice(0, 15));
-      } else {
-        setRecentTransactions([]);
-      }
     } catch (err) {
       console.error("Error fetching data:", err);
       setError("Failed to fetch dashboard data");
-      setRecentTransactions([]);
     } finally {
       setLoading(false);
     }
@@ -96,13 +82,12 @@ const Home = ({ authorization, showSidebar }) => {
     setActiveFilter(filterType);
     setDateRange([null, null]);
     try {
-      const [approvedData, pendingData, declineData, totalData, recentTrxData] =
+      const [approvedData, pendingData, declineData, totalData] =
         await Promise.all([
           fn_getCardDataByStatus("Approved", filterType, null),
           fn_getCardDataByStatus("Pending", filterType, null),
           fn_getCardDataByStatus("Decline", filterType, null),
           fn_getAllTransactionApi(null, 1, null, null, null, null),
-          fn_getAdminsTransactionApi(null, null, null, null, null),
         ]);
 
       // Set transaction counts
@@ -120,81 +105,34 @@ const Home = ({ authorization, showSidebar }) => {
         pending: pendingData?.data || {},
         failed: declineData?.data || {},
       });
-
-      // Update recent transactions
-      if (recentTrxData?.status && recentTrxData?.data?.data) {
-        setRecentTransactions(recentTrxData.data.data.slice(0, 10));
-      } else {
-        setRecentTransactions([]);
-      }
     } catch (err) {
       console.error("Error fetching filtered data:", err);
       setError("Failed to fetch filtered data");
-      setRecentTransactions([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const data = {
-    labels: [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ],
-    datasets: [
-      {
-        label: "Approved",
-        backgroundColor: "#009666",
-        data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      },
-      {
-        label: "Pending",
-        data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        backgroundColor: "#F67A03",
-      },
-      {
-        label: "Faild",
-        data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        backgroundColor: "#FF3E5E",
-      },
-    ],
+  const handleCreatePayment = () => {
+    setIsModalOpen(true);
   };
-  const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: false,
-      },
-    },
-    scales: {
-      x: {
-        grid: {
-          display: false,
-        },
-      },
-      y: {
-        grid: {
-          display: false,
-        },
-      },
-    },
-    datasets: {
-      bar: {
-        barPercentage: 0.6,
-        categoryPercentage: 0.9,
-      },
-    },
+
+  const handleModalCancel = () => {
+    setIsModalOpen(false);
+    form.resetFields();
+  };
+
+  const handleModalSubmit = async (values) => {
+    try {
+      // Here you would typically make an API call to create the payment
+      console.log('Payment details:', values);
+      setIsModalOpen(false);
+      form.resetFields();
+      // Refresh the data after creating payment
+      fetchAllData();
+    } catch (error) {
+      console.error('Error creating payment:', error);
+    }
   };
 
   return (
@@ -355,87 +293,182 @@ const Home = ({ authorization, showSidebar }) => {
           </div>
         </div>
 
-        {/* Graph and Recent Transactions */}
-        <div className="grid grid-cols-1 lg:grid-cols-3">
-          {/* Graph Section */}
-          <div className="col-span-2 bg-white p-6 mb-4 md:mb-0 md:mr-4 rounded shadow flex-1 h-[100%]">
-            <div className="w-full">
-              <div className="justify-between items-center mb-4">
-                <h2 className="text-[16px] font-[700]">TRANSACTION STATS</h2>
-                <p className="text-[11px] font-[500] text-gray-500 mt-1">
-                  Order status and tracking. Track your order from ship date to
-                  arrival.To begin, enter your order number.
-                </p>
-                <div className="grid grid-cols-2 gap-4 md:flex md:gap-12 mt-3">
-                  <Stat
-                    label="System Approved"
-                    value={verifiedTransactions}
-                    color="#029868"
-                  />
-                  <Stat
-                    label="Pending"
-                    value={unverifiedTransactions}
-                    color="#F67A03"
-                  />
-                  <Stat
-                    label="Decline"
-                    value={declineTransactions}
-                    color="#FF3E5E"
-                  />
-                </div>
-              </div>
-              <div className="w-full h-[300px]">
-                <Bar data={data} options={options} />
-              </div>
+        {/* Transaction Table Section */}
+        <div className="bg-white rounded-lg p-4">
+          <div className="flex flex-col md:flex-row items-center justify-between pb-3">
+            <div className="flex justify-between items-center w-full">
+              <p className="text-black font-[500] text-[24px] mr-2">
+                All  Transactions
+              </p>
+              <Button type="primary" className="bg-[#0864E8]" onClick={handleCreatePayment}>Create Payment</Button>
             </div>
           </div>
-
-          {/* Recent Transactions Section */}
-          <div
-            className="bg-white p-6 rounded shadow w-full flex-1 overflow-auto"
-            style={{
-              minHeight: `${totalHeight}px`,
-              maxHeight: `${totalHeight}px`,
-            }}
-          >
-            <h2 className="text-[16px] font-[700]">RECENT TRANSACTIONS</h2>
-            <p className="text-[11px] font-[500] text-gray-500 pt-1">
-              Customer is an individual or business that purchases the goods or
-              services, and the process has evolved to include real-time
-              tracking.
-            </p>
-
-            <div className="">
-              {loading ? (
-                <p className="text-center py-4">Loading...</p>
-              ) : error ? (
-                <div className="flex items-center space-x-2 mt-2 text-gray-500">
-                  <FaCircleExclamation className="text-gray-500" />
-                  <p>{error}</p>
-                </div>
-              ) : recentTransactions.length > 0 ? (
-                recentTransactions.map((transaction, index) => (
-                  <RecentTransaction
-                    key={index}
-                    name={
-                      transaction?.bankId?.accountType === "crypto"
-                        ? "Crypto"
-                        : transaction?.bankId?.bankName || "UPI"
-                    }
-                    utrId={transaction?.utr || "N/A"}
-                    status={transaction?.status || "Pending"}
-                    color={getStatusColor(transaction?.status)}
-                    amount={`₹${transaction?.amount || 0}`}
-                  />
-                ))
-              ) : (
-                <p className="text-center py-4 text-gray-500">
-                  No recent transactions
-                </p>
-              )}
-            </div>
+          <div className="w-full border-t-[1px] border-[#DDDDDD80] hidden sm:block mb-4"></div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full border">
+              <thead>
+                <tr className="bg-[#ECF0FA] text-left text-[12px] text-gray-700">
+                  <th className="p-4 text-nowrap">TRN-ID</th>
+                  <th className="p-4">DATE</th>
+                  <th className="p-4 text-nowrap">User Name</th>
+                  <th className="p-4 text-nowrap">BANK NAME</th>
+                  <th className="p-4 text-nowrap">Merchant NAME</th>
+                  <th className="p-4 text-nowrap">TOTAL AMOUNT</th>
+                  <th className="p-4 ">UTR#</th>
+                  <th className="pl-8">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* Static Data */}
+                <tr className="text-gray-800 text-sm border-b">
+                  <td className="p-4 text-[13px] font-[600] text-[#000000B2]">TRN001</td>
+                  <td className="p-4 text-[13px] font-[600] text-[#000000B2] whitespace-nowrap">01 Jan 2024, 10:30 AM</td>
+                  <td className="p-4 text-[13px] font-[700] text-[#000000B2] text-nowrap">John Doe</td>
+                  <td className="p-4 text-nowrap">
+                    <div className="">
+                      <span className="text-[13px] font-[700] text-black whitespace-nowrap">
+                        HDFC Bank
+                        <span className="font-[400]"> - 1234567890</span>
+                      </span>
+                    </div>
+                  </td>
+                  <td className="p-4 text-[13px] font-[600] text-[#000000B2]">Merchant 1</td>
+                  <td className="p-4 text-[13px] font-[700] text-[#000000B2]">
+                    <div>
+                      <FaIndianRupeeSign className="inline-block mt-[-1px]" /> 5000
+                    </div>
+                  </td>
+                  <td className="p-4 text-[12px] font-[700] text-[#0864E8]">UTR123456</td>
+                  <td className="p-4 text-[13px] font-[500]">
+                    <span className="px-2 py-1 rounded-[20px] text-nowrap text-[11px] font-[600] min-w-20 flex items-center justify-center bg-[#10CB0026] text-[#0DA000]">
+                      Approved
+                    </span>
+                  </td>
+                </tr>
+                <tr className="text-gray-800 text-sm border-b">
+                  <td className="p-4 text-[13px] font-[600] text-[#000000B2]">TRN002</td>
+                  <td className="p-4 text-[13px] font-[600] text-[#000000B2] whitespace-nowrap">01 Jan 2024, 11:45 AM</td>
+                  <td className="p-4 text-[13px] font-[700] text-[#000000B2] text-nowrap">Jane Smith</td>
+                  <td className="p-4 text-nowrap">
+                    <div className="">
+                      <p className="text-[13px] font-[700] text-black">
+                        UPI
+                        <span className="font-[400]"> - user@upi</span>
+                      </p>
+                    </div>
+                  </td>
+                  <td className="p-4 text-[13px] font-[600] text-[#000000B2]">Merchant 2</td>
+                  <td className="p-4 text-[13px] font-[700] text-[#000000B2]">
+                    <div>
+                      <FaIndianRupeeSign className="inline-block mt-[-1px]" /> 3000
+                    </div>
+                  </td>
+                  <td className="p-4 text-[12px] font-[700] text-[#0864E8]">UTR789012</td>
+                  <td className="p-4 text-[13px] font-[500]">
+                    <span className="px-2 py-1 rounded-[20px] text-nowrap text-[11px] font-[600] min-w-20 flex items-center justify-center bg-[#FFC70126] text-[#FFB800]">
+                      Pending
+                    </span>
+                  </td>
+                </tr>
+                <tr className="text-gray-800 text-sm border-b">
+                  <td className="p-4 text-[13px] font-[600] text-[#000000B2]">TRN003</td>
+                  <td className="p-4 text-[13px] font-[600] text-[#000000B2] whitespace-nowrap">01 Jan 2024, 02:15 PM</td>
+                  <td className="p-4 text-[13px] font-[700] text-[#000000B2] text-nowrap">Mike Johnson</td>
+                  <td className="p-4 text-nowrap">
+                    <div className="">
+                      <p className="text-[13px] font-[700] text-black">
+                        Crypto
+                        <span className="font-[400]"> - 0x1234...5678</span>
+                      </p>
+                    </div>
+                  </td>
+                  <td className="p-4 text-[13px] font-[600] text-[#000000B2]">Merchant 3</td>
+                  <td className="p-4 text-[13px] font-[700] text-[#000000B2]">
+                    <div>
+                      <span className="text-[#000000B2]">$ 100</span>
+                      <span className="text-[#000000B2] ml-2">/ ₹ 7500</span>
+                    </div>
+                  </td>
+                  <td className="p-4 text-[12px] font-[700] text-[#0864E8]">UTR345678</td>
+                  <td className="p-4 text-[13px] font-[500]">
+                    <span className="px-2 py-1 rounded-[20px] text-nowrap text-[11px] font-[600] min-w-20 flex items-center justify-center bg-[#FF7A8F33] text-[#FF002A]">
+                      Declined
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
+
+        {/* Create Payment Modal */}
+        <Modal
+          title="Create New Payment"
+          open={isModalOpen}
+          onCancel={handleModalCancel}
+          footer={null}
+          width={600}
+        >
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleModalSubmit}
+            className="mt-4"
+          >
+            <Form.Item
+              name="userName"
+              label="User Name"
+              rules={[{ required: true, message: 'Please enter user name' }]}
+            >
+              <Input placeholder="Enter user name" />
+            </Form.Item>
+
+            <Form.Item
+              name="amount"
+              label="Amount"
+              rules={[{ required: true, message: 'Please enter amount' }]}
+            >
+              <Input type="number" placeholder="Enter amount" prefix="₹" />
+            </Form.Item>
+
+            <Form.Item
+              name="paymentMethod"
+              label="Payment Method"
+              rules={[{ required: true, message: 'Please select payment method' }]}
+            >
+              <Select placeholder="Select payment method">
+                <Select.Option value="bank">Bank Transfer</Select.Option>
+                <Select.Option value="upi">UPI</Select.Option>
+                <Select.Option value="crypto">Crypto</Select.Option>
+              </Select>
+            </Form.Item>
+
+            <Form.Item
+              name="accountDetails"
+              label="Account Details"
+              rules={[{ required: true, message: 'Please enter account details' }]}
+            >
+              <Input placeholder="Enter account number or UPI ID" />
+            </Form.Item>
+
+            <Form.Item
+              name="merchantName"
+              label="Merchant Name"
+              rules={[{ required: true, message: 'Please enter merchant name' }]}
+            >
+              <Input placeholder="Enter merchant name" />
+            </Form.Item>
+
+            <Form.Item className="mb-0 flex justify-end">
+              <Button type="default" onClick={handleModalCancel} className="mr-2">
+                Cancel
+              </Button>
+              <Button type="primary" htmlType="submit" className="bg-[#0864E8]">
+                Create Payment
+              </Button>
+            </Form.Item>
+          </Form>
+        </Modal>
       </div>
     </div>
   );
@@ -467,42 +500,6 @@ const Boxes = ({ number, amount, title, bgColor, link }) => (
       Amount: <span className="font-[700]">₹ {amount}</span>
     </p>
   </Link>
-);
-
-const Stat = ({ label, value, color }) => (
-  <div>
-    <p className="text-[15px] font-[700]">₹ {value}</p>
-    <div className="flex pt-1 gap-1 items-center">
-      <GoDotFill style={{ color }} />
-      <p className="text-[12px] font-[500]">{label}</p>
-    </div>
-  </div>
-);
-
-const RecentTransaction = ({ name, status, color, amount, utrId }) => (
-  <div className="flex justify-between items-center py-3 border-b">
-    {/* Left Section */}
-    <div className="flex flex-col">
-      <div className="flex items-center">
-        <p className="text-[15px] font-[600]">{name}</p>
-      </div>
-
-      {/* UTR ID and Status aligned from the left */}
-      <div className="flex items-center gap-4 text-[10px] pt-1 text-[#7987A1] font-[600]">
-        {/* UTR ID */}
-        <span>UTR: {utrId}</span>
-        {/* Status aligned to the right of UTR ID */}
-        <span className="text-[10px] font-[600]" style={{ color }}>
-          {status}
-        </span>
-      </div>
-    </div>
-
-    {/* Right Section - Amount */}
-    <div className="flex flex-col items-end">
-      <p className="text-[16px] font-[600]">{amount}</p>
-    </div>
-  </div>
 );
 
 export default Home;

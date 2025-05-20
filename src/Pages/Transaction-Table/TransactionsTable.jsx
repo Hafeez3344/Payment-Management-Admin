@@ -23,10 +23,6 @@ import BACKEND_URL, {
   fn_getAdminsTransactionApi,
   fn_getAllTransactionApi,
   fn_updateTransactionStatusApi,
-  fn_getMerchantApi,
-  fn_getOverAllBanksData,
-  fn_setExchangeRate,
-  fn_getExchangeRateApi,
 } from "../../api/api";
 import { BsCurrencyExchange } from "react-icons/bs";
 import axios from "axios";
@@ -133,46 +129,6 @@ const TransactionsTable = ({ authorization, showSidebar }) => {
     };
   }, []);
 
-  // useEffect(() => {
-  //   socket.on("getMerchantLedger", (data) => {
-
-  //     console.log("data ", data);
-  //     fetchTransactions(currentPage || 1, merchant);
-  //   });
-
-  //   socket.on("error", (error) => {
-  //       console.error("Socket Error:", error.message);
-  //   });
-
-  // }, []);
-
-  // const fetchBanks = async () => {
-  //   try {
-  //     const result = await fn_getOverAllBanksData("");
-  //     if (result?.status) {
-  //       setAllBanks(
-  //         result?.data?.data?.map((item) => {
-  //           return {
-  //             value: item._id,
-  //             label:
-  //               item.bankName === "UPI" ? (
-  //                 <span>
-  //                   UPI - <span className="font-[400]">{item.iban}</span>
-  //                 </span>
-  //               ) : (
-  //                 <span>
-  //                   {item.bankName} -{" "}
-  //                   <span className="font-[400]">{item.iban}</span>
-  //                 </span>
-  //               ),
-  //           };
-  //         })
-  //       );
-  //     }
-  //   } catch (error) {
-  //     console.error("Error fetching banks:", error);
-  //   }
-  // };
 
   const fetchBanks = async () => {
     try {
