@@ -5,7 +5,6 @@ import Home from "./Components/Home/Home";
 import NavBar from "./Components/NabBar/NavBar";
 import Footer from "./Components/Footer/Footer";
 import SideBar from "./Components/Sidebar/SideBar";
-import TransactionsTable from "./Pages/Transaction-Table/TransactionsTable";
 import Login from "./Pages/Admin-Login/AdminLogin";
 
 function App() {
@@ -50,15 +49,6 @@ function App() {
             path="/"
             element={
               <Home authorization={authorization} showSidebar={showSidebar} />
-            }
-          />
-          <Route
-            path="/transactions"
-            element={
-              <TransactionsTable
-                authorization={authorization}
-                showSidebar={showSidebar}
-              />
             }
           />
         </Routes>

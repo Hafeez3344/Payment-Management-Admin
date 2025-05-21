@@ -44,7 +44,7 @@ const SideBar = ({ showSidebar, setShowSide, setAuthorization }) => {
       <div className="flex pl-[21px] h-[55px] items-center gap-3 border-b border-secondary">
         <div>
           {/* <img className="w-[130px]" src={Royal247Logo} alt="" /> */}
-          <span className="text-[20px] font-[600]">Payment Management</span>
+          <span className="text-[20px] font-[600]">Management Admin</span>
         </div>
         <button
           className="bg-gray-200 h-[25px] w-[25px] rounded-sm flex md:hidden justify-center ml-20 items-center"
