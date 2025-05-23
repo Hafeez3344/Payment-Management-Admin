@@ -39,6 +39,9 @@ const Home = ({ authorization, showSidebar }) => {
   const [modalRemarks, setModalRemarks] = useState("");
 
   useEffect(() => {
+    if(!authorization){
+      navigate("/login")
+    }
     const [startDate, endDate] = dateRange;
     const fetchPayments = async () => {
       setLoading(true);
@@ -48,7 +51,6 @@ const Home = ({ authorization, showSidebar }) => {
 
         const res = await fn_getAllPaymentApi(params.page, startDate || null, endDate || null);
         if (res && res.status === 'ok' && Array.isArray(res.data)) {
-          console.log("asdasdas ", res);
           setPayments(res.data);
           setTotalPayments(res.pagination?.total || 0);
         } else {
