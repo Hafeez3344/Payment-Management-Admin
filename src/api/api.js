@@ -30,14 +30,9 @@ export const fn_loginAdminApi = async (data) => {
 
 
 //-----------------get all user payment api------------------------------
-export const fn_getAllPaymentApi = async (page = 1, limit = 10, startDate, endDate) => {
+export const fn_getAllPaymentApi = async (page = 1, startDate, endDate) => {
     try {
-        const params = { page, limit };
-        if (startDate) params.startDate = startDate;
-        if (endDate) params.endDate = endDate;
-        const response = await axios.get(`${BACKEND_URL}/payment/getAll`, {
-            params
-        });
+        const response = await axios.get(`${BACKEND_URL}/payment/getAll?page=${page}${(startDate && endDate) ? `&startDate=${startDate}&endDate=${endDate}` : ""}`);
         if (response?.status === 200) {
             return response.data;
         }

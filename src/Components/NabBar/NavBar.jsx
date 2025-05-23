@@ -25,10 +25,10 @@ const NavBar = ({ setShowSide, showSidebar, fn_logout }) => {
 
         <div className="flex items-center gap-7 pr-7 ml-auto justify-end">
           <div
-            className="text-[rgba(105,155,247,1)] cursor-pointer flex items-center gap-2"
+            className="text-[#417ef1] cursor-pointer flex items-center gap-2"
             onClick={fn_logout}
           >
-            <LuLogOut className="text-[20px]" />
+            <LuLogOut className="text-[20px]" />Logout
           </div>
         </div>
       </div>

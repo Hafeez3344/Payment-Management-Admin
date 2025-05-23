@@ -14,7 +14,6 @@ const Home = ({ authorization, showSidebar }) => {
   const { RangePicker } = DatePicker;
   const totalHeight = window.innerHeight - 366;
   const containerHeight = window.innerHeight - 120;
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
   const [transactionModalOpen, setTransactionModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
@@ -23,9 +22,10 @@ const Home = ({ authorization, showSidebar }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(15);
+  const [pageSize, setPageSize] = useState(10);
   const [totalPayments, setTotalPayments] = useState(0);
   const [dateRange, setDateRange] = useState([null, null]);
+  const [dateRange2, setDateRange2] = useState([null, null]);
   const [cardData, setCardData] = useState({
     approvedAmount: 0,
     approvedCount: 0,
@@ -39,18 +39,16 @@ const Home = ({ authorization, showSidebar }) => {
   const [modalRemarks, setModalRemarks] = useState("");
 
   useEffect(() => {
+    const [startDate, endDate] = dateRange;
     const fetchPayments = async () => {
       setLoading(true);
       setError("");
       try {
-        let params = { page: currentPage, limit: pageSize };
-        let startDate, endDate;
-        if (dateRange[0] && dateRange[1]) {
-          startDate = dateRange[0].startOf('day').toISOString();
-          endDate = dateRange[1].endOf('day').toISOString();
-        }
-        const res = await fn_getAllPaymentApi(params.page, params.limit, startDate, endDate);
+        let params = { page: currentPage };
+
+        const res = await fn_getAllPaymentApi(params.page, startDate || null, endDate || null);
         if (res && res.status === 'ok' && Array.isArray(res.data)) {
+          console.log("asdasdas ", res);
           setPayments(res.data);
           setTotalPayments(res.pagination?.total || 0);
         } else {
@@ -108,16 +106,16 @@ const Home = ({ authorization, showSidebar }) => {
       const headers = [
         "TRN-ID",
         "Date",
-        "Account Holder Name",
+        "Account Name",
         "Bank Name",
         "Account Number",
         "IFSC/UPI ID",
         "Amount",
         "Status"
       ];
-      // Reduce column widths slightly and increase right margin for better fit
-      const columnWidths = [28, 38, 42, 38, 38, 38, 28, 28];
-      const rightMargin = 18; // Increased right margin
+      // Adjusted column widths for better spacing, ensuring "Status" fits
+      const columnWidths = [28, 45, 35, 38, 38, 38, 28, 35];
+      const rightMargin = 10; // Adjusted right margin
       let startY = 30;
       const rowHeight = 12;
       pdf.setFontSize(16);
@@ -151,18 +149,18 @@ const Home = ({ authorization, showSidebar }) => {
         pdf.text(trx.trnId?.toString() || "", currentX + 3, startY + 8);
         currentX += columnWidths[0];
         pdf.text(
-          trx.createdAt ? moment(trx.createdAt).format("DD MMM YYYY, hh:mm A") : "-",
+          trx.createdAt ? new Date(trx.createdAt).toLocaleString('en-US', options).replace(',', '').replace(' at', '') : "-",
           currentX + 3,
           startY + 8
         );
         currentX += columnWidths[1];
         pdf.text(trx.accountHolder || "-", currentX + 3, startY + 8);
         currentX += columnWidths[2];
-        pdf.text(trx.bankName || "-", currentX + 3, startY + 8);
+        pdf.text(trx.bankName || "UPI", currentX + 3, startY + 8);
         currentX += columnWidths[3];
         pdf.text(trx.accountNumber || "-", currentX + 3, startY + 8);
         currentX += columnWidths[4];
-        pdf.text(trx.ifsc || trx.accountNumber || "-", currentX + 3, startY + 8);
+        pdf.text(trx.ifsc || trx.upi || "-", currentX + 3, startY + 8);
         currentX += columnWidths[5];
         pdf.text(`${trx.amount || "0"} INR`, currentX + 3, startY + 8);
         totalAmount += parseFloat(trx.amount) || 0;
@@ -224,6 +222,9 @@ const Home = ({ authorization, showSidebar }) => {
   const handleUpdatePaymentStatus = async (status) => {
     if (!selectedTransaction) return;
     try {
+      if (modalRemarks === "" && status === "Decline") {
+        return message.error("Enter Remarks")
+      }
       const updateData = {
         _id: selectedTransaction._id,
         status: status,
@@ -255,18 +256,41 @@ const Home = ({ authorization, showSidebar }) => {
     }
   };
 
+  const formatDate = (date) => {
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const resetFilters = () => {
+    setCurrentPage(1)
+    setDateRange(() => [null, null]);
+    setDateRange2(() => [null, null]);
+    setActiveFilter("all");
+  };
+
+  const options = {
+    weekday: 'short',     // Thu
+    day: '2-digit',       // 22
+    month: 'short',       // May
+    year: 'numeric',      // 2025
+    hour: '2-digit',      // 11
+    minute: '2-digit',    // 13
+    hour12: true,         // PM
+    timeZone: 'UTC'       // Ensure UTC time
+  };
+
   return (
     <div
-      className={`bg-gray-100 transition-all duration-500 ${
-        showSidebar ? "pl-0 md:pl-[270px]" : "pl-0"
-      }`}
+      className={`bg-gray-100 transition-all duration-500 ${showSidebar ? "pl-0 md:pl-[270px]" : "pl-0"
+        }`}
       style={{ minHeight: `${containerHeight}px` }}
     >
       <div className="p-7">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row gap-[12px] items-center justify-between mb-5">
-          {/* <h1 className="text-[25px] font-[500]">Payment Management Admin</h1> */}
-         
         </div>
 
         {/* Summary Cards Section */}
@@ -274,7 +298,7 @@ const Home = ({ authorization, showSidebar }) => {
           <div className="bg-[#009666] px-[14px] py-[20px] rounded-[5px] shadow text-white flex items-center justify-between">
             <div>
               <h2 className="text-[13px] uppercase font-[500]">Approved Payments</h2>
-              <p className="mt-[13px] text-[20px] font-[700]">₹ {cardData.approvedAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+              <p className="mt-[13px] text-[20px] font-[700]">₹ {cardData.approvedAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               <p className="pt-[3px] text-[13px] font-[500] mb-[7px]">No. of Approved Payments: <span className="font-[700]">{cardData.approvedCount}</span></p>
             </div>
             <FaCheckCircle className="text-[38px] opacity-70" />
@@ -282,7 +306,7 @@ const Home = ({ authorization, showSidebar }) => {
           <div className="bg-[#f57600] px-[14px] py-[10px] rounded-[5px] shadow text-white flex items-center justify-between">
             <div>
               <h2 className="text-[13px] uppercase font-[500]">Pending Payments</h2>
-              <p className="mt-[13px] text-[20px] font-[700]">₹ {cardData.pendingAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+              <p className="mt-[13px] text-[20px] font-[700]">₹ {cardData.pendingAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               <p className="pt-[3px] text-[13px] font-[500] mb-[7px]">No. of Pending Payments: <span className="font-[700]">{cardData.pendingCount}</span></p>
             </div>
             <FaHourglassHalf className="text-[38px] opacity-70" />
@@ -290,19 +314,11 @@ const Home = ({ authorization, showSidebar }) => {
           <div className="bg-[#ff3d5c] px-[14px] py-[10px] rounded-[5px] shadow text-white flex items-center justify-between">
             <div>
               <h2 className="text-[13px] uppercase font-[500]">Rejected Payments</h2>
-              <p className="mt-[13px] text-[20px] font-[700]">₹ {cardData.declinedAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+              <p className="mt-[13px] text-[20px] font-[700]">₹ {cardData.declinedAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               <p className="pt-[3px] text-[13px] font-[500] mb-[7px]">No. of Rejected Payments: <span className="font-[700]">{cardData.declinedCount}</span></p>
             </div>
             <FaTimesCircle className="text-[38px] opacity-70" />
           </div>
-          {/* <div className="bg-[#9400d3] px-[14px] py-[10px] rounded-[5px] shadow text-white flex items-center justify-between">
-            <div>
-              <h2 className="text-[13px] uppercase font-[500]">in progress Payments</h2>
-              <p className="mt-[13px] text-[20px] font-[700]">₹ {cardData.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-              <p className="pt-[3px] text-[13px] font-[500] mb-[7px]">No. of Processing Payments: <span className="font-[700]">{cardData.totalCount}</span></p>
-            </div>
-            <FaSpinner className="text-[38px] opacity-70 animate-spin-slow" />
-          </div> */}
         </div>
 
         {/* Transaction Table Section */}
@@ -313,18 +329,19 @@ const Home = ({ authorization, showSidebar }) => {
                 All Payments
               </p>
               <div className="flex items-center space-x-2 mb-2 md:mb-0">
-                {/* <div className="flex space-x-2 text-[12px]">
-                  <button className="text-white bg-[#0864E8] border w-[70px] sm:w-[70px] p-1 rounded">ALL</button>
-                  <button className="text-black border w-[70px] sm:w-[70px] p-1 rounded">TODAY</button>
-                  <button className="text-black border w-[70px] sm:w-[70px] p-1 rounded">7 DAYS</button>
-                  <button className="text-black border w-[70px] sm:w-[70px] p-1.5 rounded">30 DAYS</button>
-                </div> */}
                 <Space direction="vertical" size={10} className="ml-4">
                   <RangePicker
-                    value={dateRange}
+                    value={dateRange2}
                     onChange={(dates) => {
-                      setDateRange(dates || [null, null]);
-                      setCurrentPage(1);
+                      if (!dates) {
+                        resetFilters();
+                      } else {
+                        const [startDate, endDate] = dates;
+                        const start = formatDate(startDate);
+                        const end = formatDate(endDate);
+                        setDateRange(() => [start, end])
+                        setDateRange2(() => [startDate, endDate])
+                      }
                     }}
                     className="bg-gray-100"
                   />
@@ -365,7 +382,8 @@ const Home = ({ authorization, showSidebar }) => {
                       className="text-gray-800 text-sm border-b border-[#e3eafc] hover:bg-[#eaf4ff] transition-colors"
                     >
                       <td className="p-4 text-[13px] font-[600] text-[#1a237e]">{trx.trnId}</td>
-                      <td className="p-4 text-[13px] font-[600] text-[#1a237e] whitespace-nowrap">{trx.createdAt ? new Date(trx.createdAt).toLocaleString() : "-"}</td>
+                      <td className="p-4 text-[13px] font-[600] text-[#1a237e] whitespace-nowrap">{trx.createdAt ? new Date(trx.createdAt).toLocaleString('en-US', options).replace(',', '').replace(' at', '') : "-"}</td>
+                      {/* <td className="p-4 text-[13px] font-[600] text-[#1a237e] whitespace-nowrap">{moment(trx.createdAt).is}</td> */}
                       <td className="p-4 text-[13px] font-[700] text-[#1a237e] text-nowrap">{trx.accountHolder || "-"}</td>
                       <td className="p-4 text-[13px] font-[700] text-[#1a237e] text-nowrap">{trx.bankName || "UPI"}</td>
                       <td className="p-4 text-[13px] font-[700] text-[#1a237e] text-nowrap">{trx.accountNumber || "-"}</td>
@@ -426,35 +444,36 @@ const Home = ({ authorization, showSidebar }) => {
                     ...(selectedTransaction.upi
                       ? [{ label: "Bank Name:", value: selectedTransaction.bankName || "UPI" }]
                       : [
-                          { label: "Bank Name:", value: selectedTransaction.bankName || "-" },
-                          { label: "Account Number:", value: selectedTransaction.accountNumber || '-' }
-                        ]),
+                        { label: "Bank Name:", value: selectedTransaction.bankName || "-" },
+                        { label: "Account Number:", value: selectedTransaction.accountNumber || '-' }
+                      ]),
                     { label: selectedTransaction.upi ? "UPI ID:" : "IFSC:", value: selectedTransaction.upi ? selectedTransaction.upi : (selectedTransaction.ifsc || "") },
                     { label: "Status:", value: selectedTransaction.status },
                   ].map((field, index) => (
                     <div className="flex items-center gap-4" key={index}>
-                      <p className="text-[12px] font-[600] w-[180px]">{field.label}</p>
+                      <p className="text-[12px] font-[600] w-[280px]">{field.label}</p>
                       <AntdInput
-                        className="w-[50%] text-[12px] input-placeholder-black bg-gray-200"
+                        className="text-[12px] input-placeholder-black bg-gray-200"
                         readOnly
                         value={field.value}
                       />
-                      {/* Copy icon for approved payments in modal */}
-                      {field.label === "Status:" && selectedTransaction.status === "Approved" && (
-                        <Tooltip title="Copy details">
-                          <FiCopy className="cursor-pointer text-gray-400 hover:text-blue-600" size={16} onClick={() => handleCopyDetails(selectedTransaction)} />
-                        </Tooltip>
-                      )}
                     </div>
                   ));
                 })()}
+                <div className="flex items-center gap-[20px] mt-[10px] border-t pt-[15px] border-gray-300">
+                <p className="w-[180px] text-[12px] font-[600]">Click to Copy Details:</p>
+                <Tooltip title="Copy details">
+                  <FiCopy className="cursor-pointer text-gray-400 hover:text-blue-600" size={16} onClick={() => handleCopyDetails(selectedTransaction)} />
+                </Tooltip>
+                </div>
                 {/* Border below Status field */}
                 <div className="border-b border-gray-300 my-2 w-full"></div>
                 {/* Remarks field always below Status field, show textarea for editing */}
                 <div className="flex items-start gap-4 mt-2">
-                  <p className="text-[12px] font-[600] w-[180px] mt-1">Remarks:</p>
+                  <p className="text-[12px] font-[600] w-[280px] mt-1">Remarks:</p>
                   <AntdInput.TextArea
-                    className="w-[50%] text-[12px] input-placeholder-black bg-gray-200"
+                    placeholder="For Decline Payment"
+                    className="text-[12px] input-placeholder-black bg-gray-50"
                     value={modalRemarks}
                     onChange={e => setModalRemarks(e.target.value)}
                     autoSize={{ minRows: 2, maxRows: 4 }}
@@ -464,7 +483,7 @@ const Home = ({ authorization, showSidebar }) => {
               {/* Approve and Decline buttons below textarea, left-aligned with icons */}
               <div className="flex gap-4 mt-6 justify-start">
                 <AntdButton
-                  className="bg-[#03996933] text-[#039969] p-2 rounded hover:bg-[#03996950] text-[13px] font-semibold min-w-[160px] flex items-center"
+                  className="bg-[#03996933] text-[#039969] p-2 rounded hover:bg-[#03996950] text-[13px] font-semibold min-w-[160px] flex items-center flex-1"
                   disabled={selectedTransaction.status === "Approved"}
                   onClick={() => handleUpdatePaymentStatus("Approved")}
                   icon={<FiCheckCircle className="mr-2" />}
@@ -472,12 +491,12 @@ const Home = ({ authorization, showSidebar }) => {
                   Approve Payment
                 </AntdButton>
                 <AntdButton
-                  className="bg-[#FF405F33] text-[#FF3F5F] p-2 rounded hover:bg-[#FF405F50] text-[13px] font-semibold min-w-[160px] flex items-center"
+                  className={"bg-[#FF405F33] text-[#FF3F5F] p-2 rounded text-[13px] font-semibold min-w-[160px] flex items-center flex-1"}
                   disabled={selectedTransaction.status === "Decline"}
                   onClick={() => handleUpdatePaymentStatus("Decline")}
                   icon={<FiXCircle className="mr-2" />}
                 >
-                  Decline
+                  Decline Payment
                 </AntdButton>
               </div>
               {/* Payment Logs Table */}
@@ -503,12 +522,12 @@ const Home = ({ authorization, showSidebar }) => {
                       {selectedTransaction?.paymentLogs && selectedTransaction.paymentLogs.length > 0 ? (
                         selectedTransaction.paymentLogs.map((log, idx) => (
                           <tr key={idx} style={{ display: 'table', width: '100%', tableLayout: 'fixed' }}>
-                            <td className="p-2 border text-nowrap text-center" style={{ width: '33%' }}>{moment(log.date).format("DD MMM YYYY, hh:mm A")}</td>
+                            <td className="p-2 border text-nowrap text-center" style={{ width: '33%' }}>{moment(log.date).add(30, 'minutes').format("DD MMM YYYY, hh:mm A")}</td>
                             <td className="p-2 border text-center" style={{ width: '33%' }}>
                               <span className={`px-2 py-1 rounded-[20px] text-nowrap text-[11px] font-[600] ${log.status === "Approved" ? "bg-[#10CB0026] text-[#0DA000]" : log.status === "Pending" ? "bg-[#FFC70126] text-[#FFB800]" : log.status === "Manual Verified" ? "bg-[#0865e851] text-[#0864E8]" : "bg-[#FF7A8F33] text-[#FF002A]"}`}>{log.status}</span>
                             </td>
                             <td className="p-2 border text-center" style={{ width: '34%' }}>
-                              {log.remarks}
+                              {log.remarks || "-"}
                             </td>
                           </tr>
                         ))

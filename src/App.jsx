@@ -11,7 +11,7 @@ function App() {
   const navigate = useNavigate();
 
   const [authorization, setAuthorization] = useState(
-    Cookies.get("token") ? true : false
+    Cookies.get("adminId") ? true : false
   );
   // const [showSidebar, setShowSide] = useState(window.innerWidth > 760 ? true : false);
   const [showSidebar, setShowSide] = useState(false);
