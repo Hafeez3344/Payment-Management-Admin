@@ -13,9 +13,8 @@ function App() {
   const [authorization, setAuthorization] = useState(
     Cookies.get("token") ? true : false
   );
-  const [showSidebar, setShowSide] = useState(
-    window.innerWidth > 760 ? true : false
-  );
+  // const [showSidebar, setShowSide] = useState(window.innerWidth > 760 ? true : false);
+  const [showSidebar, setShowSide] = useState(false);
 
   const fn_logout = () => {
     Cookies.remove("adminId");
@@ -33,7 +32,7 @@ function App() {
       )}
       <div className="min-h-[100vh]">
         {authorization && (
-          <NavBar showSidebar={showSidebar} setShowSide={setShowSide} />
+          <NavBar showSidebar={showSidebar} setShowSide={setShowSide} fn_logout={fn_logout} />
         )}
         <Routes>
           <Route

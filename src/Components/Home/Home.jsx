@@ -2,10 +2,12 @@ import { Button, DatePicker, Space, Modal, Form, Input, Select, Tooltip, message
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaIndianRupeeSign } from "react-icons/fa6";
-import { FiEye, FiCopy } from "react-icons/fi";
+import { FiEye, FiCopy, FiCheckCircle, FiXCircle } from "react-icons/fi";
 import jsPDF from "jspdf";
 import moment from "moment";
-import { fn_getAllPaymentApi, fn_updatePaymentApi } from "../../api/api";
+import { fn_getAllPaymentApi, fn_updatePaymentApi, fn_getAllCardsApi } from "../../api/api";
+import { Button as AntdButton, Input as AntdInput } from "antd";
+import { FaCheckCircle, FaHourglassHalf, FaTimesCircle, FaSpinner } from "react-icons/fa";
 
 const Home = ({ authorization, showSidebar }) => {
   const navigate = useNavigate();
@@ -24,6 +26,17 @@ const Home = ({ authorization, showSidebar }) => {
   const [pageSize, setPageSize] = useState(15);
   const [totalPayments, setTotalPayments] = useState(0);
   const [dateRange, setDateRange] = useState([null, null]);
+  const [cardData, setCardData] = useState({
+    approvedAmount: 0,
+    approvedCount: 0,
+    pendingAmount: 0,
+    pendingCount: 0,
+    declinedAmount: 0,
+    declinedCount: 0,
+    totalAmount: 0,
+    totalCount: 0,
+  });
+  const [modalRemarks, setModalRemarks] = useState("");
 
   useEffect(() => {
     const fetchPayments = async () => {
@@ -31,11 +44,12 @@ const Home = ({ authorization, showSidebar }) => {
       setError("");
       try {
         let params = { page: currentPage, limit: pageSize };
+        let startDate, endDate;
         if (dateRange[0] && dateRange[1]) {
-          params.startDate = dateRange[0].startOf('day').toISOString();
-          params.endDate = dateRange[1].endOf('day').toISOString();
+          startDate = dateRange[0].startOf('day').toISOString();
+          endDate = dateRange[1].endOf('day').toISOString();
         }
-        const res = await fn_getAllPaymentApi(params.page, params.limit, params.startDate, params.endDate);
+        const res = await fn_getAllPaymentApi(params.page, params.limit, startDate, endDate);
         if (res && res.status === 'ok' && Array.isArray(res.data)) {
           setPayments(res.data);
           setTotalPayments(res.pagination?.total || 0);
@@ -52,7 +66,29 @@ const Home = ({ authorization, showSidebar }) => {
         setLoading(false);
       }
     };
+
+    const fetchCardData = async () => {
+      try {
+        const res = await fn_getAllCardsApi();
+        if (res && res.status !== false) {
+          setCardData({
+            approvedAmount: res.approvedAmount || 0,
+            approvedCount: res.approvedCount || 0,
+            pendingAmount: res.pendingAmount || 0,
+            pendingCount: res.pendingCount || 0,
+            declinedAmount: res.declinedAmount || 0,
+            declinedCount: res.declinedCount || 0,
+            totalAmount: res.totalAmount || 0,
+            totalCount: res.totalCount || 0,
+          });
+        }
+      } catch (err) {
+        // Optionally handle error
+      }
+    };
+
     fetchPayments();
+    fetchCardData();
   }, [currentPage, pageSize, dateRange]);
 
   // Download Report Handler (works with static payments)
@@ -75,7 +111,7 @@ const Home = ({ authorization, showSidebar }) => {
         "Account Holder Name",
         "Bank Name",
         "Account Number",
-        "IFSC/UPI",
+        "IFSC/UPI ID",
         "Amount",
         "Status"
       ];
@@ -159,7 +195,6 @@ const Home = ({ authorization, showSidebar }) => {
         `Date: ${trx.createdAt ? new Date(trx.createdAt).toLocaleString() : '-'}`,
         `Account Holder Name: ${trx.accountHolder || '-'}`,
         `Bank Name: ${trx.bankName || '-'}`,
-        `Account Number: ${trx.accountNumber || '-'}`,
         `UPI ID: ${trx.ifsc || trx.upi || '-'}`,
         `Amount: ₹${trx.amount}`
       ].join('\n');
@@ -178,6 +213,13 @@ const Home = ({ authorization, showSidebar }) => {
     });
   };
 
+  // When opening the modal, initialize modalRemarks
+  const openTransactionModal = (trx) => {
+    setSelectedTransaction(trx);
+    setModalRemarks(trx.remarks || "");
+    setTransactionModalOpen(true);
+  };
+
   // Approve/Decline Payment Handlers
   const handleUpdatePaymentStatus = async (status) => {
     if (!selectedTransaction) return;
@@ -185,6 +227,7 @@ const Home = ({ authorization, showSidebar }) => {
       const updateData = {
         _id: selectedTransaction._id,
         status: status,
+        remarks: modalRemarks,
       };
       const res = await fn_updatePaymentApi(updateData);
       if (res && res.status) {
@@ -222,75 +265,88 @@ const Home = ({ authorization, showSidebar }) => {
       <div className="p-7">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row gap-[12px] items-center justify-between mb-5">
-          <h1 className="text-[25px] font-[500]">Payment Management Admin</h1>
-          <div className="flex items-center space-x-2">
-            <div className="flex space-x-2 text-[12px]">
-              <button className="text-white bg-[#0864E8] border w-[70px] sm:w-[70px] p-1 rounded">ALL</button>
-              <button className="text-black border w-[70px] sm:w-[70px] p-1 rounded">TODAY</button>
-              <button className="text-black border w-[70px] sm:w-[70px] p-1 rounded">7 DAYS</button>
-              <button className="text-black border w-[70px] sm:w-[70px] p-1.5 rounded">30 DAYS</button>
-            </div>
-            <Space direction="vertical" size={10} className="ml-4">
-              <RangePicker
-                value={dateRange}
-                onChange={(dates) => {
-                  setDateRange(dates || [null, null]);
-                  setCurrentPage(1);
-                }}
-                className="bg-gray-100"
-              />
-            </Space>
-          </div>
+          {/* <h1 className="text-[25px] font-[500]">Payment Management Admin</h1> */}
+         
         </div>
 
-        {/* Summary Cards Section (static values) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-7 text-nowrap">
-          <div className="bg-white px-[14px] py-[10px] rounded-[5px] shadow text-white" style={{backgroundImage: "linear-gradient(to right, rgba(245, 118, 0, 1), rgba(255, 196, 44, 1))"}}>
-            <h2 className="text-[13px] uppercase font-[500]">Pending Transactions</h2>
-            <p className="mt-[13px] text-[20px] font-[700]">₹ 0.00</p>
-            <p className="pt-[3px] text-[13px] font-[500] mb-[7px]">No. of Pending Transactions: <span className="font-[700]">0</span></p>
+        {/* Summary Cards Section */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-4 mb-7 text-nowrap">
+          <div className="bg-[#009666] px-[14px] py-[20px] rounded-[5px] shadow text-white flex items-center justify-between">
+            <div>
+              <h2 className="text-[13px] uppercase font-[500]">Approved Payments</h2>
+              <p className="mt-[13px] text-[20px] font-[700]">₹ {cardData.approvedAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+              <p className="pt-[3px] text-[13px] font-[500] mb-[7px]">No. of Approved Payments: <span className="font-[700]">{cardData.approvedCount}</span></p>
+            </div>
+            <FaCheckCircle className="text-[38px] opacity-70" />
           </div>
-          <div className="bg-white px-[14px] py-[10px] rounded-[5px] shadow text-white" style={{backgroundImage: "linear-gradient(to right, rgba(0, 150, 102, 1), rgba(59, 221, 169, 1))"}}>
-            <h2 className="text-[13px] uppercase font-[500]">Approved Transactions</h2>
-            <p className="mt-[13px] text-[20px] font-[700]">₹ 0.00</p>
-            <p className="pt-[3px] text-[13px] font-[500] mb-[7px]">No. of Approved Transactions: <span className="font-[700]">₹ 0.00</span></p>
+          <div className="bg-[#f57600] px-[14px] py-[10px] rounded-[5px] shadow text-white flex items-center justify-between">
+            <div>
+              <h2 className="text-[13px] uppercase font-[500]">Pending Payments</h2>
+              <p className="mt-[13px] text-[20px] font-[700]">₹ {cardData.pendingAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+              <p className="pt-[3px] text-[13px] font-[500] mb-[7px]">No. of Pending Payments: <span className="font-[700]">{cardData.pendingCount}</span></p>
+            </div>
+            <FaHourglassHalf className="text-[38px] opacity-70" />
           </div>
-          <div className="bg-white px-[14px] py-[10px] rounded-[5px] shadow text-white" style={{backgroundImage: "linear-gradient(to right, rgba(255, 61, 92, 1), rgba(255, 122, 143, 1))"}}>
-            <h2 className="text-[13px] uppercase font-[500]">Rejected Transactions</h2>
-            <p className="mt-[13px] text-[20px] font-[700]">₹ 0.00</p>
-            <p className="pt-[3px] text-[13px] font-[500] mb-[7px]">No. of Rejected Transactions: <span className="font-[700]">0</span></p>
+          <div className="bg-[#ff3d5c] px-[14px] py-[10px] rounded-[5px] shadow text-white flex items-center justify-between">
+            <div>
+              <h2 className="text-[13px] uppercase font-[500]">Rejected Payments</h2>
+              <p className="mt-[13px] text-[20px] font-[700]">₹ {cardData.declinedAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+              <p className="pt-[3px] text-[13px] font-[500] mb-[7px]">No. of Rejected Payments: <span className="font-[700]">{cardData.declinedCount}</span></p>
+            </div>
+            <FaTimesCircle className="text-[38px] opacity-70" />
           </div>
-          <div className="bg-white px-[14px] py-[10px] rounded-[5px] shadow text-white" style={{backgroundImage: "linear-gradient(to right, rgba(148, 0, 211, 1), rgba(186, 85, 211, 1))"}}>
-            <h2 className="text-[13px] uppercase font-[500]">in progress</h2>
-            <p className="mt-[13px] text-[20px] font-[700]">₹ 0.00</p>
-            <p className="pt-[3px] text-[13px] font-[500] mb-[7px]">No. of Processing Transactions: <span className="font-[700]">0</span></p>
-          </div>
+          {/* <div className="bg-[#9400d3] px-[14px] py-[10px] rounded-[5px] shadow text-white flex items-center justify-between">
+            <div>
+              <h2 className="text-[13px] uppercase font-[500]">in progress Payments</h2>
+              <p className="mt-[13px] text-[20px] font-[700]">₹ {cardData.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+              <p className="pt-[3px] text-[13px] font-[500] mb-[7px]">No. of Processing Payments: <span className="font-[700]">{cardData.totalCount}</span></p>
+            </div>
+            <FaSpinner className="text-[38px] opacity-70 animate-spin-slow" />
+          </div> */}
         </div>
 
         {/* Transaction Table Section */}
-        <div className="bg-white rounded-lg p-4">
+        <div className="bg-white rounded-xl shadow-lg p-4">
           <div className="flex flex-col md:flex-row items-center justify-between pb-3">
-            <div className="flex justify-between items-center w-full">
-              <p className="text-black font-[500] text-[24px] mr-2">
-                All Transactions
+            <div className="flex flex-col md:flex-row w-full items-center justify-between">
+              <p className="text-black font-[500] text-[24px] mr-2 mb-2 md:mb-0">
+                All Payments
               </p>
-              <Button type="primary" className="bg-[#0864E8] hover:bg-[#0056b3] text-white font-[500] text-[13px] cursor-pointer border-none" onClick={handleDownloadReport} loading={downloading}>Download Report</Button>
+              <div className="flex items-center space-x-2 mb-2 md:mb-0">
+                {/* <div className="flex space-x-2 text-[12px]">
+                  <button className="text-white bg-[#0864E8] border w-[70px] sm:w-[70px] p-1 rounded">ALL</button>
+                  <button className="text-black border w-[70px] sm:w-[70px] p-1 rounded">TODAY</button>
+                  <button className="text-black border w-[70px] sm:w-[70px] p-1 rounded">7 DAYS</button>
+                  <button className="text-black border w-[70px] sm:w-[70px] p-1.5 rounded">30 DAYS</button>
+                </div> */}
+                <Space direction="vertical" size={10} className="ml-4">
+                  <RangePicker
+                    value={dateRange}
+                    onChange={(dates) => {
+                      setDateRange(dates || [null, null]);
+                      setCurrentPage(1);
+                    }}
+                    className="bg-gray-100"
+                  />
+                </Space>
+                <Button type="primary" className="bg-[#0864E8] hover:bg-[#0056b3] text-white font-[500] text-[13px] cursor-pointer border-none ml-4" onClick={handleDownloadReport} loading={downloading}>Download Report</Button>
+              </div>
             </div>
           </div>
           <div className="w-full border-t-[1px] border-[#DDDDDD80] hidden sm:block mb-4"></div>
           <div className="overflow-x-auto">
-            <table className="min-w-full border">
+            <table className="min-w-full border-separate border-spacing-0 rounded-xl overflow-hidden bg-white">
               <thead>
-                <tr className="bg-[#ECF0FA] text-left text-[12px] text-gray-700">
-                  <th className="p-4 text-nowrap">TRN-ID</th>
-                  <th className="p-4">Date</th>
+                <tr className="bg-[#4f8cff] text-left text-[13px] text-white rounded-t-xl">
+                  <th className="p-4 text-nowrap rounded-tl-xl">TRN-ID</th>
+                  <th className="p-4 text-center">Date</th>
                   <th className="p-4 text-nowrap">Account Holder Name</th>
                   <th className="p-4 text-nowrap">Bank Name</th>
                   <th className="p-4 text-nowrap">Account Number</th>
-                  <th className="p-4 text-nowrap">{`IFSC / UPI`}</th>
+                  <th className="p-4 text-nowrap">{`IFSC / UPI ID`}</th>
                   <th className="p-4 text-nowrap">Amount</th>
-                  <th className="p-4 text- pl-16">Status</th>
-                  <th className="p-4 text-nowrap">Action</th>
+                  <th className="p-4 text-center">Status</th>
+                  <th className="p-4 text-nowrap rounded-tr-xl">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -306,65 +362,25 @@ const Home = ({ authorization, showSidebar }) => {
                   payments.map((trx, idx) => (
                     <tr
                       key={trx._id || idx}
-                      className="text-gray-800 text-sm border-b"
+                      className="text-gray-800 text-sm border-b border-[#e3eafc] hover:bg-[#eaf4ff] transition-colors"
                     >
-                      <td className="p-4 text-[13px] font-[600] text-[#000000B2]">
-                        {trx.trnId}
-                      </td>
-                      <td className="p-4 text-[13px] font-[600] text-[#000000B2] whitespace-nowrap">
-                        {trx.createdAt
-                          ? new Date(trx.createdAt).toLocaleString()
-                          : "-"}
-                      </td>
-                      {/* Account Holder Name */}
-                      <td className="p-4 text-[13px] font-[700] text-[#000000B2] text-nowrap">
-                        {trx.accountHolder || "-"}
-                      </td>
-                      {/* Bank Name */}
-                      <td className="p-4 text-[13px] font-[700] text-[#000000B2] text-nowrap">
-                        {trx.bankName || "-"}
-                      </td>
-                      {/* Account Number */}
-                      <td className="p-4 text-[13px] font-[700] text-[#000000B2] text-nowrap">
-                        {trx.accountNumber || "-"}
-                      </td>
-                      {/* IFSC/UPI */}
-                      <td className="p-4 text-[13px] font-[700] text-[#000000B2] text-nowrap">
-                        {trx.ifsc || trx.accountNumber || "-"}
-                      </td>
-                      {/* Amount */}
-                      <td className="p-4 text-[13px] font-[700] text-[#000000B2] text-nowrap">
-                        <FaIndianRupeeSign className="inline-block mt-[-1px]" />{" "}
-                        {trx.amount}
-                      </td>
-                      {/* Status */}
-                      <td className="p-4 text-[13px] font-[500]">
-                        <span
-                          className={`px-2 py-1 rounded-[20px] text-nowrap text-[11px] font-[600] min-w-20 flex items-center justify-center ${
-                            trx.status === "Approved"
-                              ? "bg-[#10CB0026] text-[#0DA000]"
-                              : trx.status === "Pending"
-                              ? "bg-[#FFC70126] text-[#FFB800]"
-                              : "bg-[#FF7A8F33] text-[#FF002A]"
-                          }`}
-                        >
-                          {trx.status}
-                        </span>
+                      <td className="p-4 text-[13px] font-[600] text-[#1a237e]">{trx.trnId}</td>
+                      <td className="p-4 text-[13px] font-[600] text-[#1a237e] whitespace-nowrap">{trx.createdAt ? new Date(trx.createdAt).toLocaleString() : "-"}</td>
+                      <td className="p-4 text-[13px] font-[700] text-[#1a237e] text-nowrap">{trx.accountHolder || "-"}</td>
+                      <td className="p-4 text-[13px] font-[700] text-[#1a237e] text-nowrap">{trx.bankName || "UPI"}</td>
+                      <td className="p-4 text-[13px] font-[700] text-[#1a237e] text-nowrap">{trx.accountNumber || "-"}</td>
+                      <td className="p-4 text-[13px] font-[700] text-[#1a237e] text-nowrap">{trx.ifsc || trx.upi || ""}</td>
+                      <td className="p-4 text-[13px] font-[700] text-[#1a237e] text-nowrap"><FaIndianRupeeSign className="inline-block mt-[-1px]" /> {trx.amount}</td>
+                      <td className="p-4 text-[13px] font-[500] text-center">
+                        <span className={`px-2 py-1 rounded-[20px] text-nowrap text-[11px] font-[600] min-w-20 flex items-center justify-center ${trx.status === "Approved" ? "bg-[#10CB0026] text-[#0DA000]" : trx.status === "Pending" ? "bg-[#FFC70126] text-[#FFB800]" : "bg-[#FF7A8F33] text-[#FF002A]"}`}>{trx.status}</span>
                       </td>
                       <td className="p-4 flex gap-2 items-center">
-                        <Tooltip title="Copy details">
-                          <FiCopy className="cursor-pointer text-gray-400 hover:text-blue-600" size={16} onClick={() => handleCopyDetails(trx)} />
-                        </Tooltip>
-                        <button
-                          className="bg-blue-100 text-blue-600 rounded-full px-2 py-2"
-                          title="View"
-                          onClick={() => {
-                            setSelectedTransaction(trx);
-                            setTransactionModalOpen(true);
-                          }}
-                        >
-                          <FiEye />
-                        </button>
+                        <button className="bg-blue-100 text-blue-600 rounded-full px-2 py-2" title="View" onClick={() => { openTransactionModal(trx); }}><FiEye /></button>
+                        {trx.status === "Approved" && (
+                          <Tooltip title="Copy details">
+                            <FiCopy className="cursor-pointer text-gray-400 hover:text-blue-600" size={16} onClick={() => handleCopyDetails(trx)} />
+                          </Tooltip>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -401,44 +417,110 @@ const Home = ({ authorization, showSidebar }) => {
           {selectedTransaction && (
             <div className="flex flex-col">
               <div className="flex flex-col gap-2 mt-4 w-full">
-                {/* Render fields as in table */}
-                {[
-                  { label: "TRN-ID:", value: selectedTransaction.trnId },
-                  { label: "Date:", value: selectedTransaction.createdAt ? new Date(selectedTransaction.createdAt).toLocaleString() : "-" },
-                  { label: "Account Holder Name:", value: selectedTransaction.accountHolder || "-" },
-                  { label: "Bank Name:", value: selectedTransaction.bankName || "-" },
-                  { label: "Account Number:", value: selectedTransaction.accountNumber || "-" },
-                  { label: "IFSC/UPI:", value: selectedTransaction.ifsc || selectedTransaction.accountNumber || "-" },
-                  { label: "Amount:", value: selectedTransaction.amount },
-                  { label: "Status:", value: selectedTransaction.status },
-                ].map((field, index) => (
-                  <div className="flex items-center gap-4" key={index}>
-                    <p className="text-[12px] font-[600] w-[180px]">{field.label}</p>
-                    <Input
-                      className="w-[50%] text-[12px] input-placeholder-black bg-gray-200"
-                      readOnly
-                      value={field.value}
-                    />
-                  </div>
-                ))}
+                {/* Render fields as in table, with UPI/bank logic */}
+                {(() => {
+                  return [
+                    { label: "TRN-ID:", value: selectedTransaction.trnId },
+                    { label: "Date:", value: selectedTransaction.createdAt ? new Date(selectedTransaction.createdAt).toLocaleString() : "-" },
+                    { label: "Account Holder Name:", value: selectedTransaction.accountHolder || "-" },
+                    ...(selectedTransaction.upi
+                      ? [{ label: "Bank Name:", value: selectedTransaction.bankName || "UPI" }]
+                      : [
+                          { label: "Bank Name:", value: selectedTransaction.bankName || "-" },
+                          { label: "Account Number:", value: selectedTransaction.accountNumber || '-' }
+                        ]),
+                    { label: selectedTransaction.upi ? "UPI ID:" : "IFSC:", value: selectedTransaction.upi ? selectedTransaction.upi : (selectedTransaction.ifsc || "") },
+                    { label: "Status:", value: selectedTransaction.status },
+                  ].map((field, index) => (
+                    <div className="flex items-center gap-4" key={index}>
+                      <p className="text-[12px] font-[600] w-[180px]">{field.label}</p>
+                      <AntdInput
+                        className="w-[50%] text-[12px] input-placeholder-black bg-gray-200"
+                        readOnly
+                        value={field.value}
+                      />
+                      {/* Copy icon for approved payments in modal */}
+                      {field.label === "Status:" && selectedTransaction.status === "Approved" && (
+                        <Tooltip title="Copy details">
+                          <FiCopy className="cursor-pointer text-gray-400 hover:text-blue-600" size={16} onClick={() => handleCopyDetails(selectedTransaction)} />
+                        </Tooltip>
+                      )}
+                    </div>
+                  ));
+                })()}
+                {/* Border below Status field */}
+                <div className="border-b border-gray-300 my-2 w-full"></div>
+                {/* Remarks field always below Status field, show textarea for editing */}
+                <div className="flex items-start gap-4 mt-2">
+                  <p className="text-[12px] font-[600] w-[180px] mt-1">Remarks:</p>
+                  <AntdInput.TextArea
+                    className="w-[50%] text-[12px] input-placeholder-black bg-gray-200"
+                    value={modalRemarks}
+                    onChange={e => setModalRemarks(e.target.value)}
+                    autoSize={{ minRows: 2, maxRows: 4 }}
+                  />
+                </div>
               </div>
-              {/* Approve and Decline buttons at the bottom, always visible */}
-              <div className="flex gap-4 mt-8 justify-center">
-                <button
-                  className="bg-[#03996933] text-[#039969] p-2 rounded hover:bg-[#03996950] text-[13px] font-semibold min-w-[160px]"
+              {/* Approve and Decline buttons below textarea, left-aligned with icons */}
+              <div className="flex gap-4 mt-6 justify-start">
+                <AntdButton
+                  className="bg-[#03996933] text-[#039969] p-2 rounded hover:bg-[#03996950] text-[13px] font-semibold min-w-[160px] flex items-center"
                   disabled={selectedTransaction.status === "Approved"}
                   onClick={() => handleUpdatePaymentStatus("Approved")}
+                  icon={<FiCheckCircle className="mr-2" />}
                 >
                   Approve Payment
-                </button>
-                <button
-                  className="bg-[#FF405F33] text-[#FF3F5F] p-2 rounded hover:bg-[#FF405F50] text-[13px] font-semibold min-w-[160px]"
+                </AntdButton>
+                <AntdButton
+                  className="bg-[#FF405F33] text-[#FF3F5F] p-2 rounded hover:bg-[#FF405F50] text-[13px] font-semibold min-w-[160px] flex items-center"
                   disabled={selectedTransaction.status === "Decline"}
                   onClick={() => handleUpdatePaymentStatus("Decline")}
+                  icon={<FiXCircle className="mr-2" />}
                 >
                   Decline
-                </button>
+                </AntdButton>
               </div>
+              {/* Payment Logs Table */}
+              {selectedTransaction?.status !== "Pending" && (
+                <div className="mt-8">
+                  <h3 className="text-[15px] font-[700] mb-2">Payment Logs</h3>
+                  <table className="min-w-full border text-[12px]" style={{ tableLayout: 'fixed', width: '100%' }}>
+                    <thead style={{ display: 'block', width: '100%' }}>
+                      <tr className="bg-gray-100" style={{ display: 'table', width: '100%', tableLayout: 'fixed' }}>
+                        <th className="p-2 border text-center" style={{ width: '33%' }}>Date</th>
+                        <th className="p-2 border text-center" style={{ width: '33%' }}>Status</th>
+                        <th className="p-2 border text-center" style={{ width: '34%' }}>Remarks</th>
+                      </tr>
+                    </thead>
+                    <tbody
+                      style={{
+                        display: 'block',
+                        maxHeight: selectedTransaction?.paymentLogs && selectedTransaction.paymentLogs.length > 3 ? '260px' : 'auto',
+                        overflowY: selectedTransaction?.paymentLogs && selectedTransaction.paymentLogs.length > 3 ? 'auto' : 'visible',
+                        width: '100%'
+                      }}
+                    >
+                      {selectedTransaction?.paymentLogs && selectedTransaction.paymentLogs.length > 0 ? (
+                        selectedTransaction.paymentLogs.map((log, idx) => (
+                          <tr key={idx} style={{ display: 'table', width: '100%', tableLayout: 'fixed' }}>
+                            <td className="p-2 border text-nowrap text-center" style={{ width: '33%' }}>{moment(log.date).format("DD MMM YYYY, hh:mm A")}</td>
+                            <td className="p-2 border text-center" style={{ width: '33%' }}>
+                              <span className={`px-2 py-1 rounded-[20px] text-nowrap text-[11px] font-[600] ${log.status === "Approved" ? "bg-[#10CB0026] text-[#0DA000]" : log.status === "Pending" ? "bg-[#FFC70126] text-[#FFB800]" : log.status === "Manual Verified" ? "bg-[#0865e851] text-[#0864E8]" : "bg-[#FF7A8F33] text-[#FF002A]"}`}>{log.status}</span>
+                            </td>
+                            <td className="p-2 border text-center" style={{ width: '34%' }}>
+                              {log.remarks}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr style={{ display: 'table', width: '100%', tableLayout: 'fixed' }}>
+                          <td className="p-2 border text-center" colSpan={3}>No logs yet.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </Modal>

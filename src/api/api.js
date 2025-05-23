@@ -30,10 +30,13 @@ export const fn_loginAdminApi = async (data) => {
 
 
 //-----------------get all user payment api------------------------------
-export const fn_getAllPaymentApi = async (page = 1, limit = 15) => {
+export const fn_getAllPaymentApi = async (page = 1, limit = 10, startDate, endDate) => {
     try {
+        const params = { page, limit };
+        if (startDate) params.startDate = startDate;
+        if (endDate) params.endDate = endDate;
         const response = await axios.get(`${BACKEND_URL}/payment/getAll`, {
-            params: { page, limit }
+            params
         });
         if (response?.status === 200) {
             return response.data;
@@ -54,6 +57,22 @@ export const fn_updatePaymentApi = async (data) => {
         const response = await axios.put(`${BACKEND_URL}/payment/update/${data._id}`, data);
         if (response?.status === 200) {
             return { status: true, message: "Payment updated successfully" };
+        }
+    } catch (error) {
+        if (error?.response?.status === 400) {
+            return { status: false, message: error?.response?.data?.message };
+        }
+        return { status: false, message: "Network Error" };
+    }
+};
+
+
+//------------------ get all cards data api------------------------------
+export const fn_getAllCardsApi = async () => {
+    try {
+        const response = await axios.get(`${BACKEND_URL}/payment/summary`);
+        if (response?.status === 200) {
+            return response.data;
         }
     } catch (error) {
         if (error?.response?.status === 400) {
