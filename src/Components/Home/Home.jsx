@@ -343,12 +343,7 @@ const Home = ({ authorization, showSidebar }) => {
                       setCurrentPage(1);
                     }}
                     options={[
-                      {
-                        value: "",
-                        label: (
-                          <span className="text-gray-400">All Status</span>
-                        ),
-                      },
+                      { value: "", label: ( <span className="text-gray-400">All Status</span> ), },
                       { value: "Approved", label: "Approved" },
                       { value: "Pending", label: "Pending" },
                       { value: "Decline", label: "Declined" },

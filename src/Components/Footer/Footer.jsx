@@ -5,8 +5,9 @@ const Footer = ({ showSidebar }) => {
 
   return (
     <div
-      className={`h-[55px] bg-white flex justify-center items-center ${showSidebar ? "pl-0 md:pl-[270px]" : "pl-0"
+      className={`bg-white flex justify-center items-center ${showSidebar ? "pl-0 md:pl-[270px]" : "pl-0"
         }`}
+      style={{ height: "55px" }}
     >
       <a 
         href="https://netrex.ae/"
