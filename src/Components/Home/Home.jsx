@@ -37,6 +37,7 @@ const Home = ({ authorization, showSidebar }) => {
     totalCount: 0,
   });
   const [modalRemarks, setModalRemarks] = useState("");
+  const [status, setStatus] = useState("");
 
   useEffect(() => {
     if(!authorization){
@@ -49,7 +50,7 @@ const Home = ({ authorization, showSidebar }) => {
       try {
         let params = { page: currentPage };
 
-        const res = await fn_getAllPaymentApi(params.page, startDate || null, endDate || null);
+        const res = await fn_getAllPaymentApi(params.page, startDate || null, endDate || null, status);
         if (res && res.status === 'ok' && Array.isArray(res.data)) {
           setPayments(res.data);
           setTotalPayments(res.pagination?.total || 0);
@@ -89,7 +90,7 @@ const Home = ({ authorization, showSidebar }) => {
 
     fetchPayments();
     fetchCardData();
-  }, [currentPage, pageSize, dateRange]);
+  }, [currentPage, pageSize, dateRange, status]);
 
   // Download Report Handler (works with static payments)
   const handleDownloadReport = async () => {
@@ -331,6 +332,29 @@ const Home = ({ authorization, showSidebar }) => {
                 All Payments
               </p>
               <div className="flex items-center space-x-2 mb-2 md:mb-0">
+                {/* Search by status - moved here */}
+                <div className="ml-0">
+                  <Select
+                    className="w-32"
+                    placeholder="Status"
+                    value={status}
+                    onChange={(value) => {
+                      setStatus(value);
+                      setCurrentPage(1);
+                    }}
+                    options={[
+                      {
+                        value: "",
+                        label: (
+                          <span className="text-gray-400">All Status</span>
+                        ),
+                      },
+                      { value: "Approved", label: "Approved" },
+                      { value: "Pending", label: "Pending" },
+                      { value: "Decline", label: "Declined" },
+                    ]}
+                  />
+                </div>
                 <Space direction="vertical" size={10} className="ml-4">
                   <RangePicker
                     value={dateRange2}
