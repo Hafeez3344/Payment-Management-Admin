@@ -5,9 +5,9 @@ import { FaIndianRupeeSign } from "react-icons/fa6";
 import { FiEye, FiCopy, FiCheckCircle, FiXCircle } from "react-icons/fi";
 import jsPDF from "jspdf";
 import moment from "moment";
-import { fn_getAllPaymentApi, fn_updatePaymentApi, fn_getAllCardsApi } from "../../api/api";
+import BACKEND_URL, { fn_getAllPaymentApi, fn_updatePaymentApi, fn_getAllCardsApi } from "../../api/api";
 import { Button as AntdButton, Input as AntdInput } from "antd";
-import { FaCheckCircle, FaHourglassHalf, FaTimesCircle, FaSpinner } from "react-icons/fa";
+import { FaCheckCircle, FaHourglassHalf, FaTimesCircle } from "react-icons/fa";
 
 const Home = ({ authorization, showSidebar }) => {
   const navigate = useNavigate();
@@ -39,8 +39,18 @@ const Home = ({ authorization, showSidebar }) => {
   const [modalRemarks, setModalRemarks] = useState("");
   const [status, setStatus] = useState("");
 
+  const [isHovering, setIsHovering] = useState(false);
+  const [mousePosition, setMousePosition] = useState({ x: 50, y: 50 });
+
+  const handleMouseMove = (e) => {
+    const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - left) / width) * 100;
+    const y = ((e.clientY - top) / height) * 100;
+    setMousePosition({ x, y });
+  };
+
   useEffect(() => {
-    if(!authorization){
+    if (!authorization) {
       navigate("/login")
     }
     const [startDate, endDate] = dateRange;
@@ -450,117 +460,193 @@ const Home = ({ authorization, showSidebar }) => {
           open={transactionModalOpen}
           onCancel={() => setTransactionModalOpen(false)}
           footer={null}
-          width={600}
+          width={1000}
           title={<p className="text-[20px] font-[700]">Transaction Details</p>}
         >
           {selectedTransaction && (
-            <div className="flex flex-col">
-              <div className="flex flex-col gap-2 mt-4 w-full">
-                {/* Render fields as in table, with UPI/bank logic */}
-                {(() => {
-                  return [
+            <div className="flex w-full">
+              {/* Left: Transaction Details */}
+              <div className="w-1/2 pr-4 border-r border-gray-200">
+                <div className="flex flex-col gap-3 mt-2">
+                  {[
                     { label: "TRN-ID:", value: selectedTransaction.trnId },
-                    { label: "Date:", value: selectedTransaction.createdAt ? new Date(selectedTransaction.createdAt).toLocaleString() : "-" },
-                    { label: "Account Holder Name:", value: selectedTransaction.accountHolder || "-" },
+                    {
+                      label: "Date:",
+                      value: selectedTransaction.createdAt
+                        ? new Date(selectedTransaction.createdAt).toLocaleString()
+                        : "-"
+                    },
+                    {
+                      label: "Account Holder Name:",
+                      value: selectedTransaction.accountHolder || "-"
+                    },
                     ...(selectedTransaction.upi
                       ? [{ label: "Bank Name:", value: selectedTransaction.bankName || "UPI" }]
                       : [
-                        { label: "Bank Name:", value: selectedTransaction.bankName || "-" },
-                        { label: "Account Number:", value: selectedTransaction.accountNumber || '-' }
+                        {
+                          label: "Bank Name:",
+                          value: selectedTransaction.bankName || "-"
+                        },
+                        {
+                          label: "Account Number:",
+                          value: selectedTransaction.accountNumber || "-"
+                        }
                       ]),
-                    { label: selectedTransaction.upi ? "UPI ID:" : "IFSC:", value: selectedTransaction.upi ? selectedTransaction.upi : (selectedTransaction.ifsc || "") },
-                    { label: "Status:", value: selectedTransaction.status },
-                  ].map((field, index) => (
-                    <div className="flex items-center gap-4" key={index}>
-                      <p className="text-[12px] font-[600] w-[280px]">{field.label}</p>
+                    {
+                      label: selectedTransaction.upi ? "UPI ID:" : "IFSC:",
+                      value: selectedTransaction.upi
+                        ? selectedTransaction.upi
+                        : selectedTransaction.ifsc || "-"
+                    },
+                    {
+                      label: "Status:",
+                      value: selectedTransaction.status
+                    }
+                  ].map((field, idx) => (
+                    <div className="flex items-center gap-3" key={idx}>
+                      <p className="text-[12px] font-[600] w-[150px]">{field.label}</p>
                       <AntdInput
                         className="text-[12px] input-placeholder-black bg-gray-200"
                         readOnly
                         value={field.value}
                       />
                     </div>
-                  ));
-                })()}
-                <div className="flex items-center gap-[20px] mt-[10px] border-t pt-[15px] border-gray-300">
-                <p className="w-[180px] text-[12px] font-[600]">Click to Copy Details:</p>
-                <Tooltip title="Copy details">
-                  <FiCopy className="cursor-pointer text-gray-400 hover:text-blue-600" size={16} onClick={() => handleCopyDetails(selectedTransaction)} />
-                </Tooltip>
-                </div>
-                {/* Border below Status field */}
-                <div className="border-b border-gray-300 my-2 w-full"></div>
-                {/* Remarks field always below Status field, show textarea for editing */}
-                <div className="flex items-start gap-4 mt-2">
-                  <p className="text-[12px] font-[600] w-[280px] mt-1">Remarks:</p>
-                  <AntdInput.TextArea
-                    placeholder="For Decline Payment"
-                    className="text-[12px] input-placeholder-black bg-gray-50"
-                    value={modalRemarks}
-                    onChange={e => setModalRemarks(e.target.value)}
-                    autoSize={{ minRows: 2, maxRows: 4 }}
-                  />
-                </div>
-              </div>
-              {/* Approve and Decline buttons below textarea, left-aligned with icons */}
-              <div className="flex gap-4 mt-6 justify-start">
-                <AntdButton
-                  className="bg-[#03996933] text-[#039969] p-2 rounded hover:bg-[#03996950] text-[13px] font-semibold min-w-[160px] flex items-center flex-1"
-                  disabled={selectedTransaction.status === "Approved"}
-                  onClick={() => handleUpdatePaymentStatus("Approved")}
-                  icon={<FiCheckCircle className="mr-2" />}
-                >
-                  Approve Payment
-                </AntdButton>
-                <AntdButton
-                  className={"bg-[#FF405F33] text-[#FF3F5F] p-2 rounded text-[13px] font-semibold min-w-[160px] flex items-center flex-1"}
-                  disabled={selectedTransaction.status === "Decline"}
-                  onClick={() => handleUpdatePaymentStatus("Decline")}
-                  icon={<FiXCircle className="mr-2" />}
-                >
-                  Decline Payment
-                </AntdButton>
-              </div>
-              {/* Payment Logs Table */}
-              {selectedTransaction?.status !== "Pending" && (
-                <div className="mt-8">
-                  <h3 className="text-[15px] font-[700] mb-2">Payment Logs</h3>
-                  <table className="min-w-full border text-[12px]" style={{ tableLayout: 'fixed', width: '100%' }}>
-                    <thead style={{ display: 'block', width: '100%' }}>
-                      <tr className="bg-gray-100" style={{ display: 'table', width: '100%', tableLayout: 'fixed' }}>
-                        <th className="p-2 border text-center" style={{ width: '33%' }}>Date</th>
-                        <th className="p-2 border text-center" style={{ width: '33%' }}>Status</th>
-                        <th className="p-2 border text-center" style={{ width: '34%' }}>Remarks</th>
-                      </tr>
-                    </thead>
-                    <tbody
-                      style={{
-                        display: 'block',
-                        maxHeight: selectedTransaction?.paymentLogs && selectedTransaction.paymentLogs.length > 3 ? '260px' : 'auto',
-                        overflowY: selectedTransaction?.paymentLogs && selectedTransaction.paymentLogs.length > 3 ? 'auto' : 'visible',
-                        width: '100%'
-                      }}
+                  ))}
+
+                  {/* Copy Details */}
+                  <div className="flex items-center gap-3 mt-2 border-t pt-2 border-gray-300">
+                    <p className="text-[12px] font-[600] w-[150px]">Click to Copy Details:</p>
+                    <Tooltip title="Copy details">
+                      <FiCopy
+                        className="cursor-pointer text-gray-400 hover:text-blue-600"
+                        size={16}
+                        onClick={() => handleCopyDetails(selectedTransaction)}
+                      />
+                    </Tooltip>
+                  </div>
+
+                  {/* Remarks */}
+                  <div className="flex items-start gap-3 mt-2">
+                    <p className="text-[12px] font-[600] w-[150px] mt-1">Remarks:</p>
+                    <AntdInput.TextArea
+                      placeholder="For Decline Payment"
+                      className="text-[12px] input-placeholder-black bg-gray-50"
+                      value={modalRemarks}
+                      onChange={e => setModalRemarks(e.target.value)}
+                      autoSize={{ minRows: 2, maxRows: 4 }}
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3 mt-4">
+                    <AntdButton
+                      className="bg-[#03996933] text-[#039969] p-2 rounded hover:bg-[#03996950] text-[13px] font-semibold flex-1 flex items-center justify-center"
+                      disabled={selectedTransaction.status === "Approved"}
+                      onClick={() => handleUpdatePaymentStatus("Approved")}
+                      icon={<FiCheckCircle className="mr-2" />}
                     >
-                      {selectedTransaction?.paymentLogs && selectedTransaction.paymentLogs.length > 0 ? (
-                        selectedTransaction.paymentLogs.map((log, idx) => (
-                          <tr key={idx} style={{ display: 'table', width: '100%', tableLayout: 'fixed' }}>
-                            <td className="p-2 border text-nowrap text-center" style={{ width: '33%' }}>{moment(log.date).add(30, 'minutes').format("DD MMM YYYY, hh:mm A")}</td>
-                            <td className="p-2 border text-center" style={{ width: '33%' }}>
-                              <span className={`px-2 py-1 rounded-[20px] text-nowrap text-[11px] font-[600] ${log.status === "Approved" ? "bg-[#10CB0026] text-[#0DA000]" : log.status === "Pending" ? "bg-[#FFC70126] text-[#FFB800]" : log.status === "Manual Verified" ? "bg-[#0865e851] text-[#0864E8]" : "bg-[#FF7A8F33] text-[#FF002A]"}`}>{log.status}</span>
-                            </td>
-                            <td className="p-2 border text-center" style={{ width: '34%' }}>
-                              {log.remarks || "-"}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr style={{ display: 'table', width: '100%', tableLayout: 'fixed' }}>
-                          <td className="p-2 border text-center" colSpan={3}>No logs yet.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                      Approve Payment
+                    </AntdButton>
+                    <AntdButton
+                      className="bg-[#FF405F33] text-[#FF3F5F] p-2 rounded text-[13px] font-semibold flex-1 flex items-center justify-center"
+                      disabled={selectedTransaction.status === "Decline"}
+                      onClick={() => handleUpdatePaymentStatus("Decline")}
+                      icon={<FiXCircle className="mr-2" />}
+                    >
+                      Decline Payment
+                    </AntdButton>
+                  </div>
+
+                  {/* Payment Logs */}
+                  {selectedTransaction.status !== "Pending" && (
+                    <div className="mt-4 ">
+                      <h3 className="text-[15px] font-[700] mb-2">Payment Logs</h3>
+                      <div
+                        className="border rounded"
+                        style={{
+                          maxHeight: "132px", // 3 rows * ~44px per row (adjust if needed)
+                          overflowY: "auto",
+                        }}
+                      >
+                        <table className="min-w-full text-[12px]">
+                          <thead>
+                            <tr className="bg-gray-100">
+                              <th className="p-2 border text-center">Date</th>
+                              <th className="p-2 border text-center">Status</th>
+                              <th className="p-2 border text-center">Remarks</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedTransaction.paymentLogs?.length > 0 ? (
+                              selectedTransaction.paymentLogs.map((log, index) => (
+                                <tr key={index}>
+                                  <td className="p-2 border text-center">
+                                    {moment(log.date)
+                                      .add(30, "minutes")
+                                      .format("DD MMM YYYY, hh:mm A")}
+                                  </td>
+                                  <td className="p-2 border text-center">
+                                    <span
+                                      className={`px-2 py-1 rounded-[20px] text-nowrap text-[11px] font-[600] ${log.status === "Approved"
+                                        ? "bg-[#10CB0026] text-[#0DA000]"
+                                        : log.status === "Pending"
+                                          ? "bg-[#FFC70126] text-[#FFB800]"
+                                          : log.status === "Manual Verified"
+                                            ? "bg-[#0865e851] text-[#0864E8]"
+                                            : "bg-[#FF7A8F33] text-[#FF002A]"
+                                        }`}
+                                    >
+                                      {log.status}
+                                    </span>
+                                  </td>
+                                  <td className="p-2 border text-center">
+                                    {log.remarks || "-"}
+                                  </td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={3} className="p-2 border text-center">
+                                  No logs yet.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
+
+              {/* Right: Image */}
+              <div className="w-1/2 pl-4 flex items-center justify-center">
+                {selectedTransaction.image ? (
+                  <div
+                    className="relative rounded-lg border-gray-200 max-w-full max-h-[500px] overflow-hidden cursor-zoom-in"
+                    style={{ width: '100%', height: '500px' }} // fixed height, full width container
+                    onMouseEnter={() => setIsHovering(true)}
+                    onMouseLeave={() => setIsHovering(false)}
+                    onMouseMove={handleMouseMove}
+                  >
+                    <img
+                      src={`${BACKEND_URL}/${selectedTransaction.image}`}
+                      alt="Proof"
+                      className="w-full h-full object-contain"
+                      style={{
+                        transformOrigin: `${mousePosition.x}% ${mousePosition.y}%`,
+                        transform: isHovering ? 'scale(2)' : 'scale(1)',
+                        transition: 'transform 0.2s ease-out',
+                        willChange: 'transform',
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="w-[280px] h-[280px] flex items-center justify-center bg-gray-100 border border-gray-200 rounded-lg text-gray-400">
+                    No Image Available
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </Modal>
