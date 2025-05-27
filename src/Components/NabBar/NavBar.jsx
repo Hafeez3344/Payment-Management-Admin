@@ -24,6 +24,7 @@ const NavBar = ({ setShowSide, showSidebar, fn_logout }) => {
     setShowSide(!showSidebar);
   };
   return (
+    // navbar start 
     <div
       className={`h-[55px]  flex justify-between transition-all duration-500 ${
         showSidebar ? "pl-0 md:pl-[270px]" : "pl-0"

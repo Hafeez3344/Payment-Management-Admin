@@ -2,8 +2,7 @@ import { message } from "antd";
 import axios from "axios";
 import Cookies from "js-cookie";
 
-const BACKEND_URL = "http://46.202.166.64:8080";
-// const BACKEND_URL = "https://payment-management-backend";
+const BACKEND_URL = "http://46.202.166.64:7000";
 
 
 
@@ -86,6 +85,7 @@ export const fn_getAllCardsApi = async () => {
         return { status: false, message: "Network Error" };
     }
 };
+
 
 
 
